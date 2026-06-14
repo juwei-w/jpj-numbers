@@ -67,11 +67,21 @@ def publish(date_str, grand):
     if c.returncode != 0 and "nothing to commit" in (c.stdout + c.stderr):
         print("publish: nothing changed.")
         return
-    pu = subprocess.run(["git", "-C", root, "push", "origin", "HEAD"], capture_output=True, text=True)
-    if pu.returncode == 0:
-        print("publish: pushed — live shortly at https://juwei-w.github.io/jpj-numbers/")
-    else:
-        print("publish: push failed:\n", pu.stderr.strip())
+    # Push, rebasing onto any concurrent remote update first. A prior run or a code
+    # push can advance origin under us between checkout and now; a bare push would be
+    # rejected ("! [rejected] main -> main (fetch first)") and the page would go stale.
+    branch = (subprocess.run(["git", "-C", root, "rev-parse", "--abbrev-ref", "HEAD"],
+                             capture_output=True, text=True).stdout.strip() or "main")
+    pu = None
+    for attempt in range(1, 4):
+        subprocess.run(["git", "-C", root, "fetch", "origin", branch], capture_output=True, text=True)
+        subprocess.run(["git", "-C", root, "rebase", f"origin/{branch}"], capture_output=True, text=True)
+        pu = subprocess.run(["git", "-C", root, "push", "origin", "HEAD"], capture_output=True, text=True)
+        if pu.returncode == 0:
+            print("publish: pushed — live shortly at https://juwei-w.github.io/jpj-numbers/")
+            return
+        print(f"publish: push rejected (attempt {attempt}/3) — re-syncing with origin/{branch}…")
+    print("publish: push failed:\n", (pu.stderr or "").strip())
 
 
 def main():
