@@ -22,12 +22,14 @@ td,th{border:1px solid #e4e4e8;padding:6px 9px;text-align:left}th{background:#f0
 td.r,th.r{text-align:right}a{color:#0a7d3c;text-decoration:none}.hide{display:none}
 .muted{color:#888;font-size:12px;margin:14px 4px 4px}
 body.searching .browse{display:none}
-#hint{display:none;font-size:12.5px;color:#fff;opacity:.95;margin-top:6px}
+#help{font-size:11.5px;color:#fff;opacity:.9;margin-top:6px}#help b{background:rgba(255,255,255,.22);padding:0 4px;border-radius:3px}
+#hint{display:none;font-size:12.5px;color:#fff;opacity:.97;margin-top:6px;font-weight:600}
 body.searching #hint{display:block}
 </style></head><body>
 <header><h1>JPJ Available Registration Numbers</h1>
 <div class=sub><b>51,664</b> numbers · Semasa 36,653 · Istimewa 15,011</div>
-<input id=q placeholder="🔍 Search a plate — e.g. VRB 9000, GM 38, JYY">
+<input id=q placeholder="🔍 Search — e.g. VRB 9014, GM 38, or wildcard SJS _00_">
+<div id=help>Tip: <b>_</b> = any digit. Try <b>SJS _00_</b>, <b>VIP 12__</b>, <b>__88</b>. Or a series/state name.</div>
 <div id=hint></div>
 </header>
 <h2 class=browse>Semasa — by state (RM 310.00 each)</h2>
@@ -119,17 +121,24 @@ var q=document.getElementById('q'),hint=document.getElementById('hint'),
     ds=document.querySelectorAll('details'),body=document.body,t;
 ds.forEach(function(d){d._g=d.querySelector('.nums');d._p=d.dataset.p;
  d._nums=[].map.call(d._g.querySelectorAll('span'),function(s){return s.textContent;});
+ d._num=d._nums.map(function(s){return s.replace(/\D/g,'');});      // number only
  d._full=d._nums.map(function(s){return '<span>'+s+'</span>';}).join('');});
 function fill(d,arr){d._g.innerHTML=arr===d._nums?d._full:arr.map(function(s){return '<span>'+s+'</span>';}).join('');}
 function run(){
- var v=q.value.trim().toLowerCase().replace(/\s+/g,''),letters=v.replace(/[0-9]/g,'');
+ var v=q.value.trim().toLowerCase().replace(/\s+/g,'');
  body.classList.toggle('searching',!!v);
  if(!v){ds.forEach(function(d){d.classList.remove('hide');d.open=false;fill(d,d._nums);});hint.textContent='';return;}
+ // split into letter-prefix + number/pattern; '_' is a single-digit wildcard
+ var pm=v.match(/^([a-z]*)([0-9_]*)$/),prefix=pm?pm[1]:'',pat=pm?pm[2]:'';
+ var wild=pat.indexOf('_')>=0, re=wild?new RegExp('^'+pat.replace(/_/g,'\\d')+'$'):null;
  var shown=0,secs=0;
  ds.forEach(function(d){
-  var nameHit=d.dataset.n.indexOf(v)>=0;
-  if(!nameHit&&letters&&d._p.indexOf(letters)<0){d.classList.add('hide');return;}
-  var m=nameHit?d._nums:d._nums.filter(function(n){return n.toLowerCase().replace(/\s+/g,'').indexOf(v)>=0;});
+  var nameHit=!wild&&d.dataset.n.indexOf(v)>=0;
+  if(!nameHit&&prefix&&d._p.indexOf(prefix)<0){d.classList.add('hide');return;}
+  var m;
+  if(nameHit){m=d._nums;}
+  else if(wild){m=[];for(var i=0;i<d._num.length;i++){if(re.test(d._num[i]))m.push(d._nums[i]);}}
+  else{m=d._nums.filter(function(n){return n.toLowerCase().replace(/\s+/g,'').indexOf(v)>=0;});}
   if(m.length){d.classList.remove('hide');d.open=true;fill(d,m);shown+=m.length;secs++;}
   else d.classList.add('hide');
  });
