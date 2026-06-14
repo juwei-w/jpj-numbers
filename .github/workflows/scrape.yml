@@ -17,6 +17,12 @@ on:
         description: "Commit + push the updated page (only meaningful with scope=all)"
         type: boolean
         default: true
+      istimewa_workers:
+        description: "Istimewa concurrent workers (blank = one per series = 13)"
+        default: ""
+      semasa_workers:
+        description: "Semasa concurrent workers (blank = 10; each is a full browser)"
+        default: ""
   # Uncomment to also run automatically (weekly, Mon 02:00 Malaysia time):
   # schedule:
   #   - cron: "0 18 * * 0"
@@ -65,6 +71,8 @@ jobs:
             echo "::error::Missing JPJ_USER / JPJ_PASS repository secrets — add them in Settings → Secrets and variables → Actions."
             exit 1
           fi
+          if [ -n "${{ inputs.istimewa_workers }}" ]; then export ISTIMEWA_WORKERS="${{ inputs.istimewa_workers }}"; fi
+          if [ -n "${{ inputs.semasa_workers }}" ]; then export SEMASA_WORKERS="${{ inputs.semasa_workers }}"; fi
           ARGS="--no-publish"
           case "${{ inputs.scope }}" in
             istimewa) ARGS="$ARGS --skip-semasa" ;;

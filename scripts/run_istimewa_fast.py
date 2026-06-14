@@ -25,7 +25,7 @@ PY = sys.executable
 SCRAPER = os.path.join(HERE, "scrape_istimewa.py")
 AUTH = config.AUTH
 PREMIUM = config.PREMIUM
-K = int(os.environ.get("ISTIMEWA_WORKERS", "8"))
+K = int(os.environ.get("ISTIMEWA_WORKERS", str(len(PREMIUM))))   # one worker per series
 MAX_CYCLES = 30
 
 
