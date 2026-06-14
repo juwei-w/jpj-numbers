@@ -27,17 +27,26 @@ import run_istimewa_fast as istimewa
 import run_semasa as semasa
 
 
-def reset_work():
+def reset_work(skip_istimewa=False, skip_semasa=False):
     """Move last run's sidecars aside so a fresh run reflects only current
-    availability (kept under work/prev for one-run recovery)."""
+    availability (kept under work/prev for one-run recovery). Only resets the
+    categories actually being scraped, so a scoped run never drops the other's data."""
+    pats = []
+    if not skip_istimewa:
+        pats.append("ist_*.md*")
+    if not skip_semasa:
+        pats.append("numbers_w*.md*")
+    if not pats:
+        return
     prev = os.path.join(config.WORK, "prev")
-    if os.path.isdir(prev):
-        shutil.rmtree(prev)
     os.makedirs(prev, exist_ok=True)
     moved = 0
-    for pat in ("ist_*.md*", "numbers_w*.md*"):
+    for pat in pats:
         for f in glob.glob(os.path.join(config.WORK, pat)):
-            shutil.move(f, os.path.join(prev, os.path.basename(f)))
+            dest = os.path.join(prev, os.path.basename(f))
+            if os.path.exists(dest):
+                os.remove(dest)
+            shutil.move(f, dest)
             moved += 1
     print(f"reset: moved {moved} prior sidecars -> work/prev", flush=True)
 
@@ -77,7 +86,7 @@ def main():
     config.ensure_dirs()
     print(f"==== JPJ full run {args.date} ({'resume' if args.resume else 'fresh'}) ====", flush=True)
     if not args.resume:
-        reset_work()
+        reset_work(args.skip_istimewa, args.skip_semasa)
 
     if not args.skip_istimewa:
         print("\n----- ISTIMEWA -----", flush=True)
