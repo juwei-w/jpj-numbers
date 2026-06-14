@@ -53,13 +53,17 @@ jobs:
           pip install -r requirements.txt
           python -m playwright install --with-deps chromium
 
-      # Persist work/ between runs so 'resume' can continue an interrupted scrape.
-      - name: Restore work cache
-        if: ${{ inputs.resume }}
+      # Persist work/ (scrape progress) across otherwise-ephemeral runs. A rolling
+      # key saves a fresh snapshot every run and restores the most recent one, so a
+      # later run with resume=true continues from there. Best-effort: a hard
+      # timeout/cancel may skip the save step.
+      - name: Cache scrape progress (work/)
         uses: actions/cache@v4
         with:
           path: work
-          key: jpj-work
+          key: jpj-work-${{ github.run_id }}
+          restore-keys: |
+            jpj-work-
 
       - name: Scrape
         env:
