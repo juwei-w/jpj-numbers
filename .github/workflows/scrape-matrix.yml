@@ -28,10 +28,10 @@ jobs:
       matrix:
         include:
           - { name: istimewa, type: istimewa, workers: 4 }
-          - { name: selangor, type: semasa, workers: 1, states: "SELANGOR" }
-          - { name: kl,       type: semasa, workers: 1, states: "WILAYAH PERSEKUTUAN KUALA LUMPUR" }
-          - { name: johor,    type: semasa, workers: 1, states: "JOHOR" }
-          - { name: perak,    type: semasa, workers: 1, states: "PERAK" }
+          - { name: selangor, type: semasa, workers: 2, states: "SELANGOR" }
+          - { name: kl,       type: semasa, workers: 2, states: "WILAYAH PERSEKUTUAN KUALA LUMPUR" }
+          - { name: johor,    type: semasa, workers: 2, states: "JOHOR" }
+          - { name: perak,    type: semasa, workers: 2, states: "PERAK" }
           - { name: north,    type: semasa, workers: 2, states: "PULAU PINANG,KEDAH,PERLIS" }
           - { name: east,     type: semasa, workers: 2, states: "KELANTAN,TERENGGANU,PAHANG" }
           - { name: central,  type: semasa, workers: 2, states: "NEGERI SEMBILAN,MELAKA,WILAYAH PERSEKUTUAN PUTRAJAYA" }

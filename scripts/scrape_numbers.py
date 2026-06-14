@@ -252,6 +252,8 @@ if __name__ == "__main__":
     ap.add_argument("--band-series", default=None)
     ap.add_argument("--band-lo", type=int, default=0)
     ap.add_argument("--band-hi", type=int, default=9999)
+    ap.add_argument("--list-series", action="store_true",
+                    help="print JSON {state: [series,...]} for --states and exit")
     args = ap.parse_args()
 
     if args.band_series:
@@ -274,5 +276,22 @@ if __name__ == "__main__":
            "SANDAKAN","SARIKEI","SELANGOR","SIBU","SRI AMAN","TAWAU","TERENGGANU",
            "WILAYAH PERSEKUTUAN KUALA LUMPUR","WILAYAH PERSEKUTUAN PUTRAJAYA"]
     states = ALL if args.all else [s.strip() for s in args.states.split(",")]
+
+    if args.list_series:
+        # Enumerate the available series per state (used to build (state,series) tasks).
+        def log(m): pass
+        out = {}
+        with sync_playwright() as p:
+            b = p.chromium.launch(headless=True)
+            ctx = b.new_context(storage_state=args.auth, viewport={"width": 1600, "height": 2400})
+            for st in states:
+                try:
+                    out[st] = setup_state_series(ctx, st, log)
+                except Exception:
+                    out[st] = []
+            b.close()
+        print(json.dumps(out))
+        raise SystemExit(0)
+
     sf = [x.strip() for x in args.series.split(",")] if args.series else None
     run(args.auth, states, args.out, sf)
