@@ -100,7 +100,8 @@ def run(states=None, headless=True):
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 pool[nxt] = (p, count(nxt))
             time.sleep(5)
-            print(progress(), flush=True)
+            running = ", ".join(sorted(pool.keys())) or "—"
+            print(f"{progress()} | running: {running}", flush=True)
 
     for cycle in range(1, MAX_CYCLES + 1):
         if all_done():
