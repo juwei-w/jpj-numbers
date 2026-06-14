@@ -13,7 +13,7 @@ def load_semasa(work=None):
     """state -> {series -> sorted[int]} unioned across all numbers_w*.md.json."""
     work = work or config.WORK
     sem = {}
-    for jf in sorted(glob.glob(os.path.join(work, "numbers_w*.md.json"))):
+    for jf in sorted(glob.glob(os.path.join(work, "numbers_*.md.json"))):
         try:
             data = json.load(open(jf))
         except Exception:

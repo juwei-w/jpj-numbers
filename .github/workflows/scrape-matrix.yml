@@ -1,0 +1,107 @@
+name: Scrape JPJ numbers (matrix)
+
+# Fan-out version: each shard runs on its OWN runner (dedicated CPUs), instead of
+# 16 browsers fighting over one VM's 2 cores. Heavy states get their own VM; light
+# states are grouped; Istimewa is one shard. A final job merges + publishes.
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Commit + push the merged page at the end"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: jpj-scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 6          # cap concurrent JPJ logins/sessions (politeness)
+      matrix:
+        include:
+          - { name: istimewa, type: istimewa, workers: 4 }
+          - { name: selangor, type: semasa, workers: 1, states: "SELANGOR" }
+          - { name: kl,       type: semasa, workers: 1, states: "WILAYAH PERSEKUTUAN KUALA LUMPUR" }
+          - { name: johor,    type: semasa, workers: 1, states: "JOHOR" }
+          - { name: perak,    type: semasa, workers: 1, states: "PERAK" }
+          - { name: north,    type: semasa, workers: 2, states: "PULAU PINANG,KEDAH,PERLIS" }
+          - { name: east,     type: semasa, workers: 2, states: "KELANTAN,TERENGGANU,PAHANG" }
+          - { name: central,  type: semasa, workers: 2, states: "NEGERI SEMBILAN,MELAKA,WILAYAH PERSEKUTUAN PUTRAJAYA" }
+          - { name: sarawak,  type: semasa, workers: 3, states: "KUCHING,KOTA SAMARAHAN,SRI AMAN,BETONG,SARIKEI,SIBU,MUKAH,BINTULU,KAPIT,MIRI,LIMBANG,LAWAS" }
+          - { name: sabah,    type: semasa, workers: 3, states: "KOTA KINABALU,BEAUFORT,KENINGAU,SANDAKAN,LAHAD DATU,TAWAU,KUDAT" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+      - name: Scrape shard (${{ matrix.name }})
+        env:
+          JPJ_USER: ${{ secrets.JPJ_USER }}
+          JPJ_PASS: ${{ secrets.JPJ_PASS }}
+          ISTIMEWA_WORKERS: ${{ matrix.workers }}
+          SEMASA_WORKERS: ${{ matrix.workers }}
+        run: |
+          set -e
+          if [ -z "$JPJ_USER" ] || [ -z "$JPJ_PASS" ]; then
+            echo "::error::Missing JPJ_USER / JPJ_PASS repository secrets."; exit 1
+          fi
+          mkdir -p work
+          if [ "${{ matrix.type }}" = "istimewa" ]; then
+            python scripts/run_istimewa_fast.py
+          else
+            python scripts/run_semasa.py --states "${{ matrix.states }}"
+          fi
+      - name: Stage sidecars (exclude the session file!)
+        run: |
+          mkdir -p shard-out
+          cp work/ist_*.md.json shard-out/ 2>/dev/null || true
+          cp work/numbers_*.md.json shard-out/ 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.name }}
+          path: shard-out/
+          if-no-files-found: warn
+
+  merge:
+    needs: scrape
+    if: ${{ always() }}        # still publish what succeeded even if a shard failed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Collect all shard sidecars into work/
+        uses: actions/download-artifact@v4
+        with:
+          path: work
+          pattern: shard-*
+          merge-multiple: true
+      - name: Merge + render
+        run: |
+          DATE=$(date -u +%F)
+          python scripts/combine_all.py --date "$DATE"
+          python scripts/make_viewable.py --date "$DATE"
+      - name: Publish
+        if: ${{ inputs.publish }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html results
+          git commit -m "update numbers ($(date -u +%F)) [skip ci]" || { echo "nothing to commit"; exit 0; }
+          git push

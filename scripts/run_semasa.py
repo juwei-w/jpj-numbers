@@ -1,15 +1,17 @@
 """
-Semasa engine — concurrent worker POOL, one state per worker.
+Semasa engine — concurrent worker POOL, one state per worker. Resumable, auto
+re-login on session expiry. Scope to a subset of states with --states (the matrix
+workflow uses this to run one shard per VM, so each state gets dedicated cores
+instead of fighting 15 other browsers for the same 2 CPUs).
 
-Each state is one task with its own resume file (work/numbers_w<n>.md.json, where
-n is the state's fixed index); up to K run in parallel. Resumable within a run;
-reuses a live session (auto-login) so a captcha is only needed on expiry.
-
-  python run_semasa.py                 # default K workers, runs to completion
-  SEMASA_WORKERS=12 python run_semasa.py
+  python run_semasa.py                          # all 32 states
+  python run_semasa.py --states "SELANGOR"      # one state (a matrix shard)
+  SEMASA_WORKERS=2 python run_semasa.py --states "KEDAH,PERLIS,KELANTAN"
 """
+import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -21,18 +23,22 @@ import login_and_save_cookies as login
 HERE = config.SCRIPTS
 PY = sys.executable
 SCRAPER = os.path.join(HERE, "scrape_numbers.py")
+ISTIMEWA = os.path.join(HERE, "scrape_istimewa.py")
 AUTH = config.AUTH
-STATES = config.STATES
-K = int(os.environ.get("SEMASA_WORKERS", "16"))
 MAX_CYCLES = 30
 
 
-def wout(i):
-    return os.path.join(config.WORK, f"numbers_w{i + 1}.md")
+def sanitize(state):
+    return re.sub(r"[^A-Za-z0-9]+", "_", state).strip("_")
 
 
-def rec(i):
-    j = wout(i) + ".json"
+def wout(state):
+    # Per-state sidecar name -> unique across shards, so matrix artifacts never collide.
+    return os.path.join(config.WORK, f"numbers_{sanitize(state)}.md")
+
+
+def rec(state):
+    j = wout(state) + ".json"
     if os.path.exists(j):
         try:
             return json.load(open(j))
@@ -41,67 +47,65 @@ def rec(i):
     return {}
 
 
-def sdone(i):
-    return bool(rec(i).get(STATES[i], {}).get("__done__"))
+def sdone(state):
+    return bool(rec(state).get(state, {}).get("__done__"))
 
 
-def count(i):
-    st = rec(i).get(STATES[i], {})
+def count(state):
+    st = rec(state).get(state, {})
     return sum(len(v) for k, v in st.items() if not k.startswith("__"))
 
 
-def all_done():
-    return all(sdone(i) for i in range(len(STATES)))
-
-
-def total_found():
-    return sum(count(i) for i in range(len(STATES)))
-
-
-def progress_line():
-    nd = sum(1 for i in range(len(STATES)) if sdone(i))
-    return f"SEMASA [{nd}/{len(STATES)} states | {total_found()} nums | {K} workers]"
-
-
-def validate():
-    """Reuse the istimewa scraper self-test as a shared session check (same cookie)."""
-    r = subprocess.run([PY, os.path.join(HERE, "scrape_istimewa.py"), "--auth", AUTH, "--test"],
-                       capture_output=True, text=True)
+def _validate():
+    """Cheap shared session check (same cookie works for both forms)."""
+    r = subprocess.run([PY, ISTIMEWA, "--auth", AUTH, "--test"], capture_output=True, text=True)
     return "PASS=True" in (r.stdout or "")
 
 
-def run_pool():
-    pool = {}
-    stalls = 0
-    while True:
-        for i, (p, cnt0) in list(pool.items()):
-            if p.poll() is not None:
-                del pool[i]
-                if sdone(i) or count(i) > cnt0:
-                    stalls = 0
-                else:
-                    stalls += 1
-        if all_done():
-            return True
-        if stalls >= K:
-            return False
-        while len(pool) < K:
-            nxt = next((i for i in range(len(STATES)) if not sdone(i) and i not in pool), None)
-            if nxt is None:
-                break
-            p = subprocess.Popen([PY, SCRAPER, "--auth", AUTH, "--states", STATES[nxt], "--out", wout(nxt)],
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            pool[nxt] = (p, count(nxt))
-        time.sleep(5)
-        print(progress_line(), flush=True)
-
-
-def run(headless=True):
+def run(states=None, headless=True):
+    states = list(states) if states else list(config.STATES)
+    K = int(os.environ.get("SEMASA_WORKERS", str(min(16, len(states)))))
     config.ensure_dirs()
+
+    def all_done():
+        return all(sdone(s) for s in states)
+
+    def total():
+        return sum(count(s) for s in states)
+
+    def progress():
+        nd = sum(1 for s in states if sdone(s))
+        return f"SEMASA [{nd}/{len(states)} states | {total()} nums | {K} workers]"
+
+    def run_pool():
+        pool = {}
+        stalls = 0
+        while True:
+            for s, (p, c0) in list(pool.items()):
+                if p.poll() is not None:
+                    del pool[s]
+                    if sdone(s) or count(s) > c0:
+                        stalls = 0          # progress or completion
+                    else:
+                        stalls += 1         # exited with nothing new -> session likely dead
+            if all_done():
+                return True
+            if stalls >= K and not pool:    # a full wave failed with empty pool
+                return False
+            while len(pool) < K:
+                nxt = next((s for s in states if not sdone(s) and s not in pool), None)
+                if nxt is None:
+                    break
+                p = subprocess.Popen([PY, SCRAPER, "--auth", AUTH, "--states", nxt, "--out", wout(nxt)],
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                pool[nxt] = (p, count(nxt))
+            time.sleep(5)
+            print(progress(), flush=True)
+
     for cycle in range(1, MAX_CYCLES + 1):
         if all_done():
             break
-        if not (os.path.exists(AUTH) and validate()):
+        if not (os.path.exists(AUTH) and _validate()):
             print(f"== semasa cycle {cycle}: logging in ==", flush=True)
             if not login.run(save_path=AUTH, headless=headless):
                 print("!! login failed — aborting semasa."); return False
@@ -110,9 +114,13 @@ def run(headless=True):
         if run_pool():
             break
         print("  session expired mid-run — re-login + resume", flush=True)
-    print(f"== semasa complete: {total_found()} numbers ==", flush=True)
+    print(f"== semasa complete: {total()} numbers ==", flush=True)
     return all_done()
 
 
 if __name__ == "__main__":
-    run()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--states", default=None, help="comma-separated subset (default: all 32)")
+    args = ap.parse_args()
+    states = [s.strip() for s in args.states.split(",")] if args.states else None
+    run(states)

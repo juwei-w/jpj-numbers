@@ -35,7 +35,7 @@ def reset_work(skip_istimewa=False, skip_semasa=False):
     if not skip_istimewa:
         pats.append("ist_*.md*")
     if not skip_semasa:
-        pats.append("numbers_w*.md*")
+        pats.append("numbers_*.md*")
     if not pats:
         return
     prev = os.path.join(config.WORK, "prev")
