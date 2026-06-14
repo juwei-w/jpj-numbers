@@ -44,9 +44,11 @@ def build(date_str):
 <title>JPJ Available Numbers</title><style>
 *{{box-sizing:border-box}}body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 margin:0;padding:0 10px 60px;background:#f5f6f8;color:#1c1c1e;-webkit-text-size-adjust:100%}}
-header{{position:sticky;top:0;background:#0a7d3c;color:#fff;margin:0 -10px 10px;padding:12px 14px;z-index:9;box-shadow:0 2px 6px rgba(0,0,0,.15)}}
-h1{{font-size:17px;margin:0 0 3px}}.sub{{font-size:12.5px;opacity:.95}}
-#q{{width:100%;padding:11px;font-size:16px;border:0;border-radius:9px;margin-top:9px}}
+header{{position:sticky;top:0;background:#0a7d3c;color:#fff;margin:0 -10px 12px;padding:12px 14px 14px;z-index:9;box-shadow:0 2px 8px rgba(0,0,0,.18)}}
+h1{{font-size:17px;margin:0 0 7px;line-height:1.25}}
+.meta{{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;font-size:12.5px;opacity:.96}}
+.meta .upd{{background:rgba(255,255,255,.18);border-radius:20px;padding:3px 11px;white-space:nowrap;font-size:12px}}
+#q{{width:100%;padding:11px 12px;font-size:16px;border:0;border-radius:10px;margin-top:11px}}
 h2{{font-size:15px;margin:18px 4px 6px;color:#0a7d3c}}
 .price{{background:#fff7e6;border:1px solid #ffd591;border-radius:9px;padding:9px 11px;font-size:12.5px;margin:8px 0}}
 details{{background:#fff;border:1px solid #e4e4e8;border-radius:9px;margin:6px 0;padding:8px 11px}}
@@ -68,8 +70,8 @@ body.searching .browse{{display:none}}
 body.searching #hint{{display:block}}
 </style></head><body>
 <header><h1>JPJ Available Registration Numbers</h1>
-<div class=sub><b>{grand:,}</b> numbers · Semasa {sem_total:,} · Istimewa {ist_total:,}</div>
-<div class=sub>🕒 Last updated: <b>{stamp}</b></div>
+<div class=meta><span><b>{grand:,}</b> numbers · Semasa {sem_total:,} · Istimewa {ist_total:,}</span>
+<span class=upd>🕒 Updated {stamp}</span></div>
 <input id=q placeholder="🔍 Search — e.g. VRB 9014, GM 38, or wildcard SJS _00_">
 <div id=help>Tip: <b>_</b> = any digit. Try <b>SJS _00_</b>, <b>VIP 12__</b>, <b>__88</b>. Or a series/state name.</div>
 <div id=hint></div>
