@@ -21,7 +21,7 @@ on:
         description: "Istimewa concurrent workers (blank = one per series = 13)"
         default: ""
       semasa_workers:
-        description: "Semasa concurrent workers (blank = 10; each is a full browser)"
+        description: "Semasa concurrent workers (blank = 16; each is a full browser)"
         default: ""
   # Uncomment to also run automatically (weekly, Mon 02:00 Malaysia time):
   # schedule:

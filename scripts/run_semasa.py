@@ -23,7 +23,7 @@ PY = sys.executable
 SCRAPER = os.path.join(HERE, "scrape_numbers.py")
 AUTH = config.AUTH
 STATES = config.STATES
-K = int(os.environ.get("SEMASA_WORKERS", "10"))
+K = int(os.environ.get("SEMASA_WORKERS", "16"))
 MAX_CYCLES = 30
 
 
