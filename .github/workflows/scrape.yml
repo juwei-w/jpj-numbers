@@ -107,10 +107,21 @@ jobs:
       - name: Publish updated page
         if: ${{ inputs.publish && success() }}
         run: |
+          # Guard: never overwrite a good page with an empty/partial scrape.
+          NEW=$(cat results/_count.txt 2>/dev/null || echo 0)
+          OLD=$(git show origin/main:results/_count.txt 2>/dev/null || echo 0)
+          if [ "${FORCE_PUBLISH:-0}" != "1" ]; then
+            if [ "${NEW:-0}" -eq 0 ] 2>/dev/null; then
+              echo "::warning::Not publishing — scrape produced 0 numbers. Live page kept; data is saved in the run artifact."; exit 0
+            fi
+            if [ "${OLD:-0}" -gt 0 ] 2>/dev/null && [ "$NEW" -lt "$((OLD/2))" ] 2>/dev/null; then
+              echo "::warning::Not publishing — new total $NEW is far below live $OLD (likely a partial scrape). Live page kept; data is saved in the run artifact."; exit 0
+            fi
+          fi
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html results
-          git commit -m "update numbers ($(date -u +%F)) [skip ci]" || { echo "nothing to commit"; exit 0; }
+          git commit -m "update numbers ($(date -u +%F): ${NEW} available) [skip ci]" || { echo "nothing to commit"; exit 0; }
           # Rebase onto any concurrent push before pushing, else "fetch first" rejects us.
           for i in 1 2 3; do
             git pull --rebase --autostash origin main && git push && exit 0

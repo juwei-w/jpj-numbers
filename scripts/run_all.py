@@ -51,6 +51,20 @@ def reset_work(skip_istimewa=False, skip_semasa=False):
     print(f"reset: moved {moved} prior sidecars -> work/prev", flush=True)
 
 
+def _published_count(root):
+    """Grand total currently published (from results/_count.txt on origin/main, then
+    HEAD). 0 if unknown — used to refuse clobbering a good page with an empty scrape."""
+    for ref in ("origin/main", "HEAD"):
+        r = subprocess.run(["git", "-C", root, "show", f"{ref}:results/_count.txt"],
+                           capture_output=True, text=True)
+        if r.returncode == 0:
+            try:
+                return int(r.stdout.strip())
+            except ValueError:
+                pass
+    return 0
+
+
 def publish(date_str, grand):
     """Commit + push index.html and the dated snapshot to GitHub Pages."""
     root = config.ROOT
@@ -61,6 +75,18 @@ def publish(date_str, grand):
     if not subprocess.run(["git", "-C", root, "remote"], capture_output=True, text=True).stdout.strip():
         print("publish: no git remote 'origin' — skipping.")
         return
+    # Guard: never let an empty/partial scrape overwrite a good page. A failed login or
+    # half-finished run renders 0 (or far fewer) numbers; publishing that wipes the site.
+    if not os.environ.get("FORCE_PUBLISH"):
+        prev = _published_count(root)
+        if grand == 0:
+            print("publish: REFUSING — new result has 0 numbers; keeping the live page. "
+                  "(Data is still in work/.) Set FORCE_PUBLISH=1 to override.")
+            return
+        if prev and grand < prev // 2:
+            print(f"publish: REFUSING — new total {grand:,} is far below the live {prev:,} "
+                  f"(likely a partial scrape). Set FORCE_PUBLISH=1 to override.")
+            return
     subprocess.run(["git", "-C", root, "add", "-A"], check=False)
     msg = f"update numbers {date_str} ({grand:,} available)"
     c = subprocess.run(["git", "-C", root, "commit", "-m", msg], capture_output=True, text=True)
@@ -111,6 +137,12 @@ def main():
     grand = (sum(len(v) for st in dataload.load_semasa().values() for v in st.values())
              + sum(len(v) for v in dataload.load_istimewa().values()))
     print(f"GRAND TOTAL: {grand:,} available numbers", flush=True)
+    # Record the count so the publish guard (here and in the workflow) can refuse to
+    # overwrite a good page with an emptier one. Written even with --no-publish so the
+    # cloud workflow's separate publish step can read it.
+    os.makedirs(config.RESULTS, exist_ok=True)
+    with open(os.path.join(config.RESULTS, "_count.txt"), "w") as fh:
+        fh.write(str(grand))
 
     if not args.no_publish:
         print("\n----- PUBLISH -----", flush=True)

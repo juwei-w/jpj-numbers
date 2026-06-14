@@ -35,6 +35,8 @@ def build(date_str):
     sem_total = sum(len(v) for st in sem.values() for v in st.values())
     ist_total = sum(len(v) for v in ist.values())
     grand = sem_total + ist_total
+    myt = datetime.timezone(datetime.timedelta(hours=8))
+    stamp = datetime.datetime.now(myt).strftime("%d %b %Y, %H:%M (MYT)")
 
     parts = []
     parts.append(f"""<!doctype html><html lang=en><head><meta charset=utf-8>
@@ -66,7 +68,8 @@ body.searching .browse{{display:none}}
 body.searching #hint{{display:block}}
 </style></head><body>
 <header><h1>JPJ Available Registration Numbers</h1>
-<div class=sub><b>{grand:,}</b> numbers · Semasa {sem_total:,} · Istimewa {ist_total:,} · <b>updated {date_str}</b></div>
+<div class=sub><b>{grand:,}</b> numbers · Semasa {sem_total:,} · Istimewa {ist_total:,}</div>
+<div class=sub>🕒 Last updated: <b>{stamp}</b></div>
 <input id=q placeholder="🔍 Search — e.g. VRB 9014, GM 38, or wildcard SJS _00_">
 <div id=help>Tip: <b>_</b> = any digit. Try <b>SJS _00_</b>, <b>VIP 12__</b>, <b>__88</b>. Or a series/state name.</div>
 <div id=hint></div>
