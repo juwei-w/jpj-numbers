@@ -1,0 +1,17 @@
+# ---- SECRETS — never commit ----
+config.local.json
+**/auth.json
+*.env
+.env
+
+# ---- intermediate run data (regenerated each run) ----
+work/
+
+# ---- python / playwright ----
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# legacy stray diagnostics
+diag/

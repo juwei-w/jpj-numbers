@@ -1,0 +1,4 @@
+playwright==1.60.0
+ddddocr==1.5.6
+# ddddocr pulls in onnxruntime + pillow + numpy (the offline captcha model).
+# After install, also run:  python -m playwright install chromium
