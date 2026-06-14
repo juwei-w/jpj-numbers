@@ -31,7 +31,10 @@ Usage:
   python scrape_istimewa.py --auth ./auth.json --series GM      # one series only
 """
 from playwright.sync_api import sync_playwright
-import argparse, time, re, json, os, urllib.parse
+import argparse, time, re, json, os, sys, urllib.parse
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import pace
 
 TARGET = "https://public.jpj.gov.my/public/#/vel/04velnummgt/vel04ReserveNumberAdd"
 JULAT = "Julat (Pilihan Dalam Lingkungan 50 Nombor)"
@@ -326,7 +329,7 @@ def scan_series(page, state, series, log):
                 boxes = select_series_julat(ctx, page, series)
                 if not boxes:
                     raise SessionExpired()
-        time.sleep(RATE)
+        pace.nap()        # jittered polite delay between searches
     rec["done"] = True
     save(state)
     log(f"=== {series}: DONE — {len(found)} available numbers ===")

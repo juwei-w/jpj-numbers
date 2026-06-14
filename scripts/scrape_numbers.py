@@ -22,6 +22,7 @@ import zk_lib as zk
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config
+import pace
 
 TARGET = zk.TARGET
 
@@ -121,6 +122,7 @@ def scan_series(ctx, state, series, log, step=50, max_empty=4, max_windows=200,
     if start is None:
         start = 9999 - (9999 % step)  # 9950
     a = start
+    bo = pace.Backoff()
     while a >= floor and windows < max_windows:
         windows += 1
         if not found and windows > no_found_limit:
@@ -131,10 +133,13 @@ def scan_series(ctx, state, series, log, step=50, max_empty=4, max_windows=200,
             log(f"      {series}: no search UI — series not released, skipping")
             break
         if nums == "NOFORM":
+            bo.stress()        # form/render failure — back off before retrying
             log(f"      {series} {a}: (retry)"); nums = cari_window(ctx, state, series, a, a + step - 1)
             if nums == "NOJULAT":
                 log(f"      {series}: no search UI — series not released, skipping")
                 break
+        else:
+            bo.ok()
         nums = nums if isinstance(nums, list) else []
         available.update(nums)
         if nums:
@@ -147,6 +152,7 @@ def scan_series(ctx, state, series, log, step=50, max_empty=4, max_windows=200,
                     log(f"      {series}: stopping (boundary passed at {a})")
                     break
         a -= step
+        pace.nap()       # jittered polite delay between windows
     return sorted(available)
 
 
