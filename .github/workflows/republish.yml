@@ -1,0 +1,53 @@
+name: Re-publish from a saved result
+
+# Recovery button: if a scrape run finished gathering numbers but failed at the
+# publish step (or anything after), it still uploaded a "jpj-result-<run_id>"
+# artifact. This workflow takes that artifact and publishes it — no re-scraping.
+# Find the run_id in the failed run's URL (.../actions/runs/<run_id>).
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Run ID whose jpj-result-<id> artifact to publish"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: jpj-scrape          # share the scrape group so it can't race a live publish
+  cancel-in-progress: false
+
+jobs:
+  republish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Download the saved result
+        uses: actions/download-artifact@v4
+        with:
+          name: jpj-result-${{ inputs.run_id }}
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: incoming
+
+      - name: Move into place + publish
+        run: |
+          set -e
+          # The artifact preserved repo-root structure (index.html, results/, work/…).
+          if [ -f incoming/index.html ]; then cp incoming/index.html index.html; fi
+          if [ -d incoming/results ];   then cp -r incoming/results/. results/; fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html results
+          git commit -m "re-publish numbers from run ${{ inputs.run_id }} [skip ci]" \
+            || { echo "nothing to commit — the page already matches this result."; exit 0; }
+          # Same rebase-then-push guard as the scrape workflow.
+          for i in 1 2 3; do
+            git pull --rebase --autostash origin main && git push && exit 0
+            echo "push rejected (attempt $i/3) — re-syncing with origin/main…"; sleep 3
+          done
+          echo "::error::push failed after 3 attempts"; exit 1

@@ -86,8 +86,26 @@ jobs:
           echo "running: run_all.py $ARGS"
           python scripts/run_all.py $ARGS
 
+      # Failure-safe: preserve the scraped result as an artifact REGARDLESS of how the
+      # run ends. If a later step — or the final push — fails, the data is NOT lost:
+      # download this artifact and re-publish in seconds (see the "Re-publish" workflow).
+      # Only the data sidecars + rendered output are included — never work/auth.json
+      # (the live session cookie), so no credentials ever leave the runner.
+      - name: Upload result (failure-safe)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: jpj-result-${{ github.run_id }}
+          path: |
+            index.html
+            results/
+            work/numbers_*.md.json
+            work/ist_*.md.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Publish updated page
-        if: ${{ inputs.publish }}
+        if: ${{ inputs.publish && success() }}
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

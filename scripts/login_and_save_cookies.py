@@ -150,9 +150,16 @@ def run(username=None, password=None, save_path=None, attempts=10, manual=False,
                     print(f"  attempt error: {type(e).__name__}: {e}", flush=True)
                 time.sleep(1.0)
             if not ok:
+                browser.close()
+                if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+                    # Headless cloud runner: no human, no display, and re-entering the
+                    # sync Playwright API here crashes ("sync API inside asyncio loop").
+                    # Fail cleanly so the shard reports a login failure, not a traceback.
+                    print("auto-login failed after retries (headless CI — no manual fallback).",
+                          flush=True)
+                    return False
                 print("auto-login failed after retries — opening a browser for manual captcha.",
                       flush=True)
-                browser.close()
                 return run(username, password, save_path, manual=True)
 
         if not ok:
